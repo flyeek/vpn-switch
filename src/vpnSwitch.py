@@ -72,7 +72,6 @@ def main(workflow):
 
     if not args.action:
         queryKey = args.query.strip()
-        workflow.logger.debug('query key length = {}'.format(len(queryKey)))
         vpnList = []
 
         process = subprocess.Popen('scutil --nc list', shell=True, stdout=subprocess.PIPE)
