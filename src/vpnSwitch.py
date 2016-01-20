@@ -6,15 +6,13 @@ import argparse
 from workflow import Workflow
 
 
-VPN_CONTROL_START = '-on'
-VPN_CONTROL_STOP = '-off'
-
 ICON_ON_ORDERLY = './vpn_on_orderly.png'
 ICON_OFF_CURRENT = './vpn_off_current.png'
 ICON_ON = './vpn_on.png'
 ICON_OFF = './vpn_off.png'
 
 VPN_TYPE_L2TP = 'L2TP'
+VPN_STATUS_CONNECTED = 'connected'
 
 def search_key_for_vpn(vpnInfo):
      """Generate a string search key for a post"""
@@ -73,7 +71,8 @@ def main(workflow):
         return 0
 
     if not args.action:
-        queryKey = args.query
+        queryKey = args.query.strip()
+        workflow.logger.debug('query key length = {}'.format(len(queryKey)))
         vpnList = []
 
         process = subprocess.Popen('scutil --nc list', shell=True, stdout=subprocess.PIPE)
@@ -84,25 +83,23 @@ def main(workflow):
         patternStatus = re.compile(r'\*\ \(.+\)')
         while True:
             line = process.stdout.readline()
-            # print line
             if len(line) > 0:
                 vpnId = patternId.search(line).group()
                 vpnName = patternName.search(line).group()[1:-1]
                 vpnType = patternType.search(line).group()[1:-1].split(':')[1]
                 vpnStatus = patternStatus.search(line).group()[3:-1].lower()
                 vpnInfo = {'id':vpnId, 'name':vpnName, 'type':vpnType, 'status':vpnStatus}
-                # print vpnInfo
                 vpnList.append(vpnInfo)
             elif process.poll() != None:
                 break
 
         # add switch on vpn orderly item if possible.
-        if queryKey != None and len(queryKey) <=3 and VPN_CONTROL_START.startswith(queryKey):
+        if queryKey != None and len(queryKey) == 0:
             connectedVpn = None
             vpnIds = []
             vpnTypes = []
             for item in vpnList:
-                if item['status'] == 'connected':
+                if item['status'] == VPN_STATUS_CONNECTED:
                     connectedVpn = item
                     break
                 else:
@@ -116,7 +113,7 @@ def main(workflow):
                     icon=ICON_ON_ORDERLY, arg=actionArg, valid=True)
 
         # add switch off item if possible.
-        if queryKey != None and len(queryKey) <=4 and VPN_CONTROL_STOP.startswith(queryKey):
+        if queryKey != None and len(queryKey) == 0:
             connectedVpn = None
             for item in vpnList:
                 if item['status'] == 'connected':
@@ -133,8 +130,12 @@ def main(workflow):
 
         for item in vpnList:
             subtitle = '(' + item['status'] + ')' + item['type']
-            actionArg = 'on,' + item['id'] + ',' + item['type']
-            icon = ICON_ON if item['status'] == 'connected' else ICON_OFF
+            actionArg = item['id'] + ',' + item['type']
+            if item['status'] == VPN_STATUS_CONNECTED:
+                actionArg = 'off,' + actionArg
+            else:
+                actionArg = 'on,' + actionArg
+            icon = ICON_ON if item['status'] == VPN_STATUS_CONNECTED else ICON_OFF
             workflow.add_item(title=item['name'], subtitle=subtitle, icon=icon,
                 arg=actionArg, valid=True)
 
